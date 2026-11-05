@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b3b2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>够级记牌器 · 六副牌</title>
+<style>
+:root{--bg-1:#0e4536;--bg-2:#061d17;--gold:#e8bd6b;--gold-deep:#d3a54f;--gold-dim:rgba(232,189,107,.16);--line:rgba(255,255,255,.12);--red:#b23a2c;--ink:#17231d;--ally:#2e7d5b;--foe:#8a3b2e}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:radial-gradient(120% 80% at 50% -10%,#17604a 0%,rgba(23,96,74,0) 55%),radial-gradient(90% 70% at 50% 110%,#0a2f25 0%,rgba(10,47,37,0) 60%),linear-gradient(180deg,var(--bg-1),var(--bg-2));color:#eef5f1;min-height:100vh;min-height:100dvh;display:flex;justify-content:center;padding:calc(12px + env(safe-area-inset-top)) 14px calc(12px + env(safe-area-inset-bottom));user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.app{width:100%;max-width:560px;display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-direction:column;gap:8px}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+h1{margin:0;font-size:22px;font-weight:800;letter-spacing:.04em;line-height:1.2}
+h1 span{color:var(--gold)}
+.badge{flex:none;font-size:10px;letter-spacing:.12em;color:var(--gold);background:var(--gold-dim);border:1px solid rgba(232,189,107,.38);border-radius:999px;padding:4px 9px}
+.sub{margin:0;font-size:11px;letter-spacing:.03em;color:rgba(238,245,241,.5)}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:15px}
+.mode{border:0;background:transparent;color:rgba(238,245,241,.58);border-radius:11px;padding:8px 6px;font:inherit;cursor:pointer;display:flex;align-items:baseline;justify-content:center;gap:7px;transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+.mode b{font-size:15px;font-weight:700}
+.mode span{font-size:11px;opacity:.72}
+.mode.active{background:linear-gradient(180deg,#efc778,var(--gold-deep));color:#241a06;box-shadow:0 2px 10px rgba(0,0,0,.28)}
+.mode.active span{opacity:.68}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);padding:8px 4px;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:16px}
+.stat{text-align:center;position:relative}
+.stat+.stat::before{content:"";position:absolute;left:0;top:16%;bottom:16%;width:1px;background:var(--line)}
+.stat b{display:block;font-size:24px;line-height:1.15;font-weight:800;font-variant-numeric:tabular-nums;color:#fff}
+.stat span{font-size:10px;letter-spacing:.12em;color:rgba(238,245,241,.48)}
+.group{display:flex;flex-direction:column;gap:8px}
+.group-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px;font-size:12px;letter-spacing:.08em;color:rgba(238,245,241,.62)}
+.hint{font-size:10px;letter-spacing:.04em;color:rgba(238,245,241,.35)}
+</style>
+<style>
+/* 玩家手牌区 */
+.player-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pcard{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:76px;padding:8px 4px 6px;border-radius:13px;border:1.5px solid var(--line);background:rgba(255,255,255,.05);cursor:pointer;transition:transform .08s ease,border-color .2s ease,background .2s ease;outline:none;overflow:hidden}
+.pcard.ally{border-color:rgba(46,125,91,.4);background:rgba(46,125,91,.08)}
+.pcard.foe{border-color:rgba(178,58,44,.35);background:rgba(178,58,44,.06)}
+.pcard.self{border-color:rgba(232,189,107,.45);background:rgba(232,189,107,.07)}
+.pcard:active{transform:translateY(1px) scale(.97)}
+.pcard:focus-visible{box-shadow:0 0 0 2px var(--gold)}
+.pcard .pname{font-size:11px;font-weight:600;letter-spacing:.06em;color:rgba(238,245,241,.7)}
+.pcard.self .pname{color:var(--gold)}
+.pcard .pcount{font-size:26px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;color:#fff;transition:color .2s ease}
+.pcard .pstatus{font-size:9px;letter-spacing:.08em;color:rgba(238,245,241,.4);margin-top:1px;min-height:12px}
+.pcard.warn{border-color:#e8923c;background:rgba(232,146,60,.12);box-shadow:0 0 12px rgba(232,146,60,.2)}
+.pcard.warn .pcount{color:#f5a960}
+.pcard.warn .pstatus{color:#e8923c;font-weight:700}
+.pcard.done{border-color:var(--ally);background:rgba(46,125,91,.15)}
+.pcard.done .pcount{color:#4caf7d}
+.pcard.done .pstatus{color:#4caf7d;font-weight:700}
+.pcard.range .pcount{font-size:20px;color:#f5a960}
+.pcard .pplus{position:absolute;top:4px;right:4px;width:22px;height:22px;padding:0;display:grid;place-items:center;border:1px solid rgba(255,255,255,.12);border-radius:50%;background:rgba(255,255,255,.06);color:rgba(238,245,241,.6);font:inherit;font-size:14px;line-height:1;cursor:pointer;z-index:2}
+.pcard .pplus:active{background:rgba(255,255,255,.14);transform:scale(.92)}
+.pcard .pplus:disabled{opacity:.2;cursor:default}
+.pcard .preport{position:absolute;top:4px;left:4px;padding:1px 5px;border:0;border-radius:999px;background:rgba(232,146,60,.2);color:#e8923c;font:inherit;font-size:8px;font-weight:700;letter-spacing:.1em;cursor:pointer;z-index:2}
+.pcard .preport:active{background:rgba(232,146,60,.35)}
+.player-actions{display:flex;gap:8px}
+.player-actions .action{flex:1}
+/* 牌面区 */
+.big-grid,.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:82px;padding:9px 4px 7px;border:0;border-radius:13px;background:linear-gradient(180deg,#fffefb 0%,#f6f0e2 100%);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 -2px 0 rgba(0,0,0,.05) inset,0 5px 14px rgba(0,0,0,.24);text-align:center;cursor:pointer;transition:transform .08s ease,opacity .25s ease,filter .25s ease;outline:none}
+.card.big{min-height:98px}
+.card:active{transform:translateY(1px) scale(.97)}
+.card:focus-visible{box-shadow:0 0 0 2px var(--gold),0 5px 14px rgba(0,0,0,.24)}
+.card .rank{font-size:13px;font-weight:700;letter-spacing:.08em;color:#6c7a72}
+.card.big .rank{font-size:14px}
+.card .count{font-size:30px;font-weight:800;line-height:1.05;color:var(--ink);font-variant-numeric:tabular-nums;transition:color .2s ease}
+.card.big .count{font-size:38px}
+.card .total{margin-top:1px;font-size:10px;letter-spacing:.04em;color:#9aa79f}
+.card.r-red .rank,.card.r-red .count{color:var(--red)}
+.card.r-gold .rank,.card.r-gold .count{color:#a9761c}
+.card.r-dark .count{color:#2b3a33}
+.card.zero{opacity:.4;filter:grayscale(.7)}
+.dead{display:none;position:absolute;top:6px;left:6px;padding:1px 5px;border-radius:999px;background:var(--red);color:#fff;font-size:9px;font-weight:700;letter-spacing:.12em}
+.card.zero .dead{display:block}
+.plus{position:absolute;top:5px;right:5px;width:26px;height:26px;padding:0;display:grid;place-items:center;border:1px solid rgba(0,0,0,.09);border-radius:50%;background:rgba(0,0,0,.06);color:#4f5d55;font:inherit;font-size:16px;line-height:1;cursor:pointer;z-index:2}
+.plus::before{content:"";position:absolute;inset:-8px;border-radius:50%}
+.plus:active{background:rgba(0,0,0,.13);transform:scale(.94)}
+.plus:disabled{opacity:.22;cursor:default}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.action{padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.06);color:#eef5f1;font:inherit;font-size:14px;letter-spacing:.04em;cursor:pointer;transition:background .15s ease,opacity .2s ease}
+.action:active{background:rgba(255,255,255,.12)}
+.action:disabled{opacity:.3;cursor:default}
+.action:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.action.danger{color:#ffb9ad;border-color:rgba(255,120,100,.22);background:rgba(255,80,60,.07)}
+.action.danger:active{background:rgba(255,80,60,.14)}
+.footnote{margin:-2px 0 0;text-align:center;font-size:10px;letter-spacing:.05em;color:rgba(238,245,241,.3)}
+</style>
+<style>
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,8px);padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:rgba(8,26,20,.94);box-shadow:0 10px 26px rgba(0,0,0,.32);color:#eaf5ef;font-size:12px;letter-spacing:.03em;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;z-index:40;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.modal{position:fixed;inset:0;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:50}
+.modal[hidden]{display:none}
+.dialog{width:100%;max-width:320px;padding:18px;border:1px solid rgba(255,255,255,.14);border-radius:18px;background:#123a2e;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.dialog h2{margin:0 0 8px;font-size:16px}
+.dialog p{margin:0 0 12px;font-size:13px;line-height:1.6;color:rgba(238,245,241,.68)}
+.dialog .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dialog button{padding:11px;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:rgba(255,255,255,.06);color:#eef5f1;font:inherit;cursor:pointer}
+.dialog button.primary{background:var(--gold);border-color:var(--gold);color:#241a06;font-weight:700}
+.dialog select,.dialog input[type=number]{width:100%;padding:10px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(0,0,0,.25);color:#eef5f1;font:inherit;font-size:14px;margin-bottom:10px}
+.dialog select option{background:#123a2e}
+.dialog .quick-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.dialog .quick-btn{padding:8px 0;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.06);color:#eef5f1;font:inherit;font-size:13px;cursor:pointer;text-align:center}
+.dialog .quick-btn:active{background:rgba(255,255,255,.14)}
+.dialog .quick-btn.sel{background:var(--gold);border-color:var(--gold);color:#241a06;font-weight:700}
+@keyframes pop{0%{transform:scale(1)}35%{transform:scale(.92)}100%{transform:scale(1)}}
+.card.hit{animation:pop .22s ease}
+.pcard.hit{animation:pop .22s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.card.shake,.pcard.shake{animation:shake .22s ease}
+@keyframes floatUp{0%{opacity:0;transform:translate(-50%,-30%) scale(.9)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-170%) scale(1.05)}}
+.float{position:absolute;left:50%;top:38%;font-size:18px;font-weight:800;color:var(--red);pointer-events:none;text-shadow:0 1px 2px rgba(255,255,255,.6);animation:floatUp .65s ease forwards;z-index:3}
+.float.up{color:#2e7d5b}
+@media (min-width:620px){.app{max-width:640px}.grid{grid-template-columns:repeat(6,1fr)}}
+@media (max-width:360px){.app{gap:10px}.card{min-height:74px;border-radius:12px}.card.big{min-height:88px}.card .count{font-size:26px}.card.big .count{font-size:32px}.pcard{min-height:68px}.pcard .pcount{font-size:22px}}
+@media (max-height:780px){.card{min-height:78px}.card.big{min-height:92px}.card .count{font-size:28px}.card.big .count{font-size:34px}.pcard{min-height:70px}.pcard .pcount{font-size:24px}}
+@media (max-height:700px){.app{gap:10px}.card{min-height:72px}.card.big{min-height:86px}.card .count{font-size:26px}.card.big .count{font-size:30px}.pcard{min-height:64px}.pcard .pcount{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="topline">
+      <h1>够级<span>记牌器</span></h1>
+      <span class="badge">六副牌 · 6 人</span>
+    </div>
+    <p class="sub">3×6 · 4~2×24 · 小王/大王/鹰×6</p>
+    <div class="modes" role="tablist" aria-label="牌局模式">
+      <button class="mode active" id="modeEagle" data-mode="eagle" role="tab" aria-selected="true" type="button">
+        <b>带鹰</b><span id="eagleTotal">312 张</span>
+      </button>
+      <button class="mode" id="modePlain" data-mode="plain" role="tab" aria-selected="false" type="button">
+        <b>不带鹰</b><span id="plainTotal">306 张</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="统计">
+    <div class="stat"><b id="statRemain">312</b><span>剩余</span></div>
+    <div class="stat"><b id="statPlayed">0</b><span>已出</span></div>
+    <div class="stat"><b id="statAvg">52</b><span>每家约</span></div>
+  </section>
+
+  <section class="group">
+    <div class="group-head"><span>玩家手牌</span><span class="hint">点玩家 -1 · +加回 · 报=少于十张</span></div>
+    <div class="player-grid" id="playerGrid"></div>
+    <div class="player-actions">
+      <button class="action" id="batchBtn" type="button">批量出牌</button>
+      <button class="action" id="undoPlayerBtn" type="button" disabled>↶ 撤销玩家</button>
+    </div>
+  </section>
+
+  <section class="group">
+    <div class="group-head"><span>大牌</span><span class="hint">点牌面记一张</span></div>
+    <div class="big-grid" id="bigGrid"></div>
+  </section>
+
+  <section class="group">
+    <div class="group-head"><span>普通牌</span><span class="hint">右上角 + 加回</span></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <div class="actions">
+    <button class="action" id="undoBtn" type="button" disabled>↶ 撤销牌面</button>
+    <button class="action danger" id="resetBtn" type="button">重置</button>
+  </div>
+
+  <p class="footnote">数据自动保存在本机 · 刷新不丢</p>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- 通用确认对话框 -->
+<div class="modal" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h2 id="dlgTitle">确认</h2>
+    <p id="dlgText"></p>
+    <div class="row">
+      <button id="dlgCancel" type="button">取消</button>
+      <button id="dlgOk" class="primary" type="button">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 批量出牌对话框 -->
+<div class="modal" id="batchModal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true">
+    <h2>批量出牌</h2>
+    <p>选择玩家和出牌张数</p>
+    <select id="batchPlayer" type="text"></select>
+    <div class="quick-row" id="batchQuick"></div>
+    <input type="number" id="batchAmount" min="1" max="54" value="1" placeholder="自定义张数">
+    <div class="row">
+      <button id="batchCancel" type="button">取消</button>
+      <button id="batchOk" class="primary" type="button">出牌</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var NUM_PLAYERS = 6;
+  var DECKS = {
+    '大王': 6, '小王': 6, '鹰': 6, '2': 24,
+    'A': 24, 'K': 24, 'Q': 24, 'J': 24, '10': 24,
+    '9': 24, '8': 24, '7': 24, '6': 24, '5': 24, '4': 24, '3': 6
+  };
+  var BIG = ['大王', '小王', '鹰', '2'];
+  var NORMAL = ['10', 'J', 'Q', 'K', 'A', '3', '4', '5', '6', '7', '8', '9'];
+  var ALL = BIG.concat(NORMAL);
+  var STORE_KEY = 'gouji6.counter.v2';
+
+  /* 玩家座位: 上联 对头 上家 / 下联 自家 下家 */
+  var PLAYER_NAMES = ['上联', '对头', '上家', '下联', '自家', '下家'];
+  var PLAYER_ALLIANCE = ['ally', 'foe', 'foe', 'ally', 'self', 'foe'];
+
+  var state = {
+    mode: 'eagle',
+    remaining: {},
+    history: [],
+    players: [],
+    playerHistory: []
+  };
+
+  var tiles = {};
+  var pcards = [];
+
+  var el = {};
+  var toastTimer = null;
+  var confirmAction = null;
+
+  function shown(rank) {
+    return rank !== '鹰' || state.mode === 'eagle';
+  }
+
+  function baseRemaining(mode) {
+    var out = {};
+    for (var i = 0; i < ALL.length; i += 1) {
+      var rank = ALL[i];
+      out[rank] = (rank === '鹰' && mode === 'plain') ? 0 : DECKS[rank];
+    }
+    return out;
+  }
+
+  function totalFor(mode) {
+    var sum = 0;
+    for (var i = 0; i < ALL.length; i += 1) {
+      var rank = ALL[i];
+      if (rank === '鹰' && mode === 'plain') continue;
+      sum += DECKS[rank];
+    }
+    return sum;
+  }
+
+  function perPlayer(mode) {
+    return Math.floor(totalFor(mode) / NUM_PLAYERS);
+  }
+
+  function totalCards() { return totalFor(state.mode); }
+  function remainingCards() {
+    var sum = 0;
+    for (var i = 0; i < ALL.length; i += 1) {
+      var rank = ALL[i];
+      if (shown(rank)) sum += state.remaining[rank];
+    }
+    return sum;
+  }
+  function playedCards() { return totalCards() - remainingCards(); }
+
+  /* ===== 玩家手牌逻辑 ===== */
+  /* 每个玩家: {min, max} 精确值时 min==max, 范围时 min<max */
+  function initPlayers() {
+    var pp = perPlayer(state.mode);
+    state.players = [];
+    for (var i = 0; i < NUM_PLAYERS; i += 1) {
+      state.players.push({ min: pp, max: pp });
+    }
+    state.playerHistory = [];
+  }
+
+  function playerStart() { return perPlayer(state.mode); }
+
+  function playerPlay(pid, n) {
+    var p = state.players[pid];
+    p.min = Math.max(0, p.min - n);
+    p.max = Math.max(0, p.max - n);
+    state.playerHistory.push({ pid: pid, n: n });
+    if (state.playerHistory.length > 200) state.playerHistory.shift();
+  }
+
+  function playerAddBack(pid, n) {
+    var p = state.players[pid];
+    var cap = playerStart();
+    p.min = Math.min(cap, p.min + n);
+    p.max = Math.min(cap, p.max + n);
+    state.playerHistory.push({ pid: pid, n: -n });
+    if (state.playerHistory.length > 200) state.playerHistory.shift();
+  }
+
+  function playerReport(pid) {
+    /* 报牌: 标记为 1~9 (少于十张) */
+    state.players[pid] = { min: 1, max: 9 };
+    state.playerHistory.push({ pid: pid, report: true });
+    if (state.playerHistory.length > 200) state.playerHistory.shift();
+  }
+
+  function playerUndo() {
+    var act = state.playerHistory.pop();
+    if (!act) return;
+    if (act.report) {
+      var pp = playerStart();
+      state.players[act.pid] = { min: pp, max: pp };
+    } else if (act.n > 0) {
+      playerAddBack(act.pid, act.n);
+      state.playerHistory.pop(); /* 去掉 addBack 产生的记录 */
+    } else {
+      playerPlay(act.pid, -act.n);
+      state.playerHistory.pop();
+    }
+  }
+
+  function isPlayerDone(p) { return p.min === 0 && p.max === 0; }
+  function isPlayerWarn(p) { return p.max > 0 && p.max < 10; }
+  function isPlayerRange(p) { return p.min !== p.max; }
+
+  /* ===== 存储 ===== */
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        mode: state.mode,
+        remaining: state.remaining,
+        history: state.history.slice(-500),
+        players: state.players,
+        playerHistory: state.playerHistory.slice(-200)
+      }));
+    } catch (e) {}
+  }
+
+  function load() {
+    state.remaining = baseRemaining('eagle');
+    initPlayers();
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (!data || (data.mode !== 'eagle' && data.mode !== 'plain')) return;
+      state.mode = data.mode;
+      state.remaining = baseRemaining(state.mode);
+      if (data.remaining && typeof data.remaining === 'object') {
+        for (var i = 0; i < ALL.length; i += 1) {
+          var rank = ALL[i];
+          var value = Number(data.remaining[rank]);
+          if (Number.isFinite(value)) {
+            state.remaining[rank] = Math.max(0, Math.min(DECKS[rank], Math.floor(value)));
+          }
+        }
+      }
+      if (state.mode === 'plain') state.remaining['鹰'] = 0;
+      if (Array.isArray(data.history)) {
+        state.history = data.history.filter(function (item) {
+          return item && typeof item.rank === 'string' &&
+            ALL.indexOf(item.rank) !== -1 && (item.delta === 1 || item.delta === -1);
+        }).slice(-500);
+      }
+      if (Array.isArray(data.players) && data.players.length === NUM_PLAYERS) {
+        for (var j = 0; j < NUM_PLAYERS; j += 1) {
+          var p = data.players[j];
+          if (p && Number.isFinite(p.min) && Number.isFinite(p.max)) {
+            state.players[j] = {
+              min: Math.max(0, Math.floor(p.min)),
+              max: Math.max(0, Math.floor(p.max))
+            };
+          }
+        }
+      }
+      if (Array.isArray(data.playerHistory)) {
+        state.playerHistory = data.playerHistory.slice(-200);
+      }
+    } catch (e) {}
+  }
+
+  /* ===== DOM 构建 ===== */
+  function makeTile(rank, big) {
+    var tile = document.createElement('div');
+    tile.className = 'card' + (big ? ' big' : '');
+    if (rank === '大王' || rank === '2') tile.classList.add('r-red');
+    else if (rank === '小王') tile.classList.add('r-dark');
+    else if (rank === '鹰') tile.classList.add('r-gold');
+    tile.dataset.rank = rank;
+    tile.tabIndex = 0;
+    tile.setAttribute('role', 'button');
+    tile.innerHTML =
+      '<span class="rank">' + rank + '</span>' +
+      '<span class="count">0</span>' +
+      '<span class="total">共 0</span>' +
+      '<span class="dead">绝</span>' +
+      '<button class="plus" type="button" tabindex="-1" aria-label="加回一张' + rank + '">+</button>';
+    tile.addEventListener('click', function (event) {
+      if (event.target.closest('.plus')) return;
+      play(rank);
+    });
+    tile.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); play(rank); }
+    });
+    var plus = tile.querySelector('.plus');
+    plus.addEventListener('click', function (event) { event.stopPropagation(); addBack(rank); });
+    return tile;
+  }
+
+  function buildBoard() {
+    el.bigGrid.innerHTML = '';
+    el.grid.innerHTML = '';
+    tiles = {};
+    for (var i = 0; i < BIG.length; i += 1) {
+      var bigRank = BIG[i];
+      if (!shown(bigRank)) continue;
+      var bigTile = makeTile(bigRank, true);
+      tiles[bigRank] = bigTile;
+      el.bigGrid.appendChild(bigTile);
+    }
+    for (var j = 0; j < NORMAL.length; j += 1) {
+      var rank = NORMAL[j];
+      var tile = makeTile(rank, false);
+      tiles[rank] = tile;
+      el.grid.appendChild(tile);
+    }
+    el.bigGrid.style.gridTemplateColumns = 'repeat(' + el.bigGrid.children.length + ', 1fr)';
+  }
+
+  function makePlayerCard(pid) {
+    var card = document.createElement('div');
+    card.className = 'pcard ' + PLAYER_ALLIANCE[pid];
+    card.dataset.pid = pid;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.innerHTML =
+      '<button class="preport" type="button" tabindex="-1">报</button>' +
+      '<span class="pname">' + PLAYER_NAMES[pid] + '</span>' +
+      '<span class="pcount">52</span>' +
+      '<span class="pstatus">起手</span>' +
+      '<button class="pplus" type="button" tabindex="-1">+</button>';
+    card.addEventListener('click', function (event) {
+      if (event.target.closest('.pplus')) return;
+      if (event.target.closest('.preport')) return;
+      playerPlay(pid, 1);
+      save();
+      updateAllPlayers();
+      animatePlayer(pid, '-1', false);
+    });
+    card.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); playerPlay(pid, 1); save(); updateAllPlayers(); animatePlayer(pid, '-1', false); }
+    });
+    var pplus = card.querySelector('.pplus');
+    pplus.addEventListener('click', function (event) {
+      event.stopPropagation();
+      playerAddBack(pid, 1);
+      save();
+      updateAllPlayers();
+      animatePlayer(pid, '+1', true);
+    });
+    var preport = card.querySelector('.preport');
+    preport.addEventListener('click', function (event) {
+      event.stopPropagation();
+      var p = state.players[pid];
+      if (isPlayerRange(p)) {
+        /* 已是范围, 取消报牌恢复初始 */
+        var pp = playerStart();
+        state.players[pid] = { min: pp, max: pp };
+        state.playerHistory.push({ pid: pid, report: true, cancel: true });
+      } else {
+        playerReport(pid);
+      }
+      save();
+      updateAllPlayers();
+      showToast(PLAYER_NAMES[pid] + ' 报牌: 少于十张');
+    });
+    return card;
+  }
+
+  function buildPlayers() {
+    el.playerGrid.innerHTML = '';
+    pcards = [];
+    for (var i = 0; i < NUM_PLAYERS; i += 1) {
+      var card = makePlayerCard(i);
+      pcards.push(card);
+      el.playerGrid.appendChild(card);
+    }
+  }
+
+  /* ===== 更新视图 ===== */
+  function updateTile(rank) {
+    var tile = tiles[rank];
+    if (!tile) return;
+    var left = state.remaining[rank];
+    var cap = DECKS[rank];
+    tile.querySelector('.count').textContent = String(left);
+    tile.querySelector('.total').textContent = '共 ' + cap;
+    tile.classList.toggle('zero', left === 0);
+    tile.setAttribute('aria-label', rank + '，剩余 ' + left + ' 张');
+    tile.querySelector('.plus').disabled = left >= cap;
+  }
+
+  function updateAll() {
+    for (var i = 0; i < ALL.length; i += 1) {
+      if (shown(ALL[i])) updateTile(ALL[i]);
+    }
+    var remain = remainingCards();
+    el.statRemain.textContent = String(remain);
+    el.statPlayed.textContent = String(totalCards() - remain);
+    var avg = Math.round((remain / NUM_PLAYERS) * 10) / 10;
+    el.statAvg.textContent = String(avg).replace(/\.0$/, '');
+    el.undoBtn.disabled = state.history.length === 0;
+  }
+
+  function updatePlayerCard(pid) {
+    var card = pcards[pid];
+    if (!card) return;
+    var p = state.players[pid];
+    var countEl = card.querySelector('.pcount');
+    var statusEl = card.querySelector('.pstatus');
+    var pplus = card.querySelector('.pplus');
+    var preport = card.querySelector('.preport');
+
+    card.classList.remove('warn', 'done', 'range');
+
+    if (isPlayerDone(p)) {
+      card.classList.add('done');
+      countEl.textContent = '0';
+      statusEl.textContent = '走科';
+      pplus.disabled = true;
+    } else if (isPlayerRange(p)) {
+      card.classList.add('range');
+      if (isPlayerWarn(p)) card.classList.add('warn');
+      countEl.textContent = p.min + '~' + p.max;
+      if (p.min === 0) {
+        statusEl.textContent = '可能走科';
+      } else if (p.max < 10) {
+        statusEl.textContent = '少于十张';
+      } else {
+        statusEl.textContent = '报牌范围';
+      }
+      pplus.disabled = false;
+    } else {
+      /* 精确值 */
+      countEl.textContent = String(p.min);
+      if (p.min < 10) {
+        card.classList.add('warn');
+        statusEl.textContent = '少于十张';
+      } else if (p.min === 0) {
+        card.classList.add('done');
+        statusEl.textContent = '走科';
+      } else {
+        statusEl.textContent = '';
+      }
+      pplus.disabled = false;
+    }
+
+    preport.textContent = isPlayerRange(p) ? '✓' : '报';
+    card.setAttribute('aria-label', PLAYER_NAMES[pid] + '，剩余 ' + (isPlayerRange(p) ? p.min + '到' + p.max : p.min) + ' 张');
+  }
+
+  function updateAllPlayers() {
+    for (var i = 0; i < NUM_PLAYERS; i += 1) updatePlayerCard(i);
+    el.undoPlayerBtn.disabled = state.playerHistory.length === 0;
+  }
+
+  function syncMode() {
+    var eagle = state.mode === 'eagle';
+    el.modeEagle.classList.toggle('active', eagle);
+    el.modePlain.classList.toggle('active', !eagle);
+    el.modeEagle.setAttribute('aria-selected', eagle ? 'true' : 'false');
+    el.modePlain.setAttribute('aria-selected', eagle ? 'false' : 'true');
+    el.eagleTotal.textContent = totalFor('eagle') + ' 张';
+    el.plainTotal.textContent = totalFor('plain') + ' 张';
+  }
+
+  /* ===== 动画 / Toast / Dialog ===== */
+  function animate(rank, text, up) {
+    var tile = tiles[rank];
+    if (!tile) return;
+    tile.classList.remove('hit');
+    void tile.offsetWidth;
+    tile.classList.add('hit');
+    setTimeout(function () { tile.classList.remove('hit'); }, 240);
+    var f = document.createElement('span');
+    f.className = 'float' + (up ? ' up' : '');
+    f.textContent = text;
+    tile.appendChild(f);
+    setTimeout(function () { f.remove(); }, 700);
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
+  }
+
+  function animatePlayer(pid, text, up) {
+    var card = pcards[pid];
+    if (!card) return;
+    card.classList.remove('hit');
+    void card.offsetWidth;
+    card.classList.add('hit');
+    setTimeout(function () { card.classList.remove('hit'); }, 240);
+    var f = document.createElement('span');
+    f.className = 'float' + (up ? ' up' : '');
+    f.textContent = text;
+    card.appendChild(f);
+    setTimeout(function () { f.remove(); }, 700);
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
+  }
+
+  function flash(tile, cn) {
+    if (!tile) return;
+    tile.classList.remove(cn);
+    void tile.offsetWidth;
+    tile.classList.add(cn);
+    setTimeout(function () { tile.classList.remove(cn); }, 260);
+  }
+
+  function showToast(msg) {
+    el.toast.textContent = msg;
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.toast.classList.remove('show'); }, 1400);
+  }
+
+  function confirmDialog(title, message, onConfirm) {
+    el.dlgTitle.textContent = title;
+    el.dlgText.textContent = message;
+    confirmAction = onConfirm;
+    el.modal.hidden = false;
+    setTimeout(function () { el.dlgOk.focus(); }, 30);
+  }
+
+  function closeDialog(ok) {
+    el.modal.hidden = true;
+    var action = confirmAction;
+    confirmAction = null;
+    if (ok && action) action();
+  }
+
+  /* ===== 牌面操作 ===== */
+  function play(rank) {
+    if (!shown(rank)) return;
+    if (state.remaining[rank] <= 0) { flash(tiles[rank], 'shake'); showToast(rank + ' 已出完'); return; }
+    state.remaining[rank] -= 1;
+    state.history.push({ rank: rank, delta: -1 });
+    if (state.history.length > 500) state.history.shift();
+    save();
+    updateAll();
+    animate(rank, '-1', false);
+  }
+
+  function addBack(rank) {
+    if (!shown(rank)) return;
+    if (state.remaining[rank] >= DECKS[rank]) { flash(tiles[rank], 'shake'); return; }
+    state.remaining[rank] += 1;
+    state.history.push({ rank: rank, delta: 1 });
+    if (state.history.length > 500) state.history.shift();
+    save();
+    updateAll();
+    animate(rank, '+1', true);
+  }
+
+  function undo() {
+    var action = state.history.pop();
+    if (!action) return;
+    var next = state.remaining[action.rank] - action.delta;
+    state.remaining[action.rank] = Math.max(0, Math.min(DECKS[action.rank], next));
+    save();
+    updateAll();
+    animate(action.rank, action.delta < 0 ? '+1' : '-1', action.delta < 0);
+    showToast('已撤销');
+  }
+
+  /* ===== 模式切换 / 重置 ===== */
+  function setMode(mode) {
+    if (mode === state.mode) return;
+    var apply = function () {
+      state.mode = mode;
+      state.remaining = baseRemaining(mode);
+      state.history = [];
+      initPlayers();
+      save();
+      buildBoard();
+      buildPlayers();
+      updateAll();
+      updateAllPlayers();
+      syncMode();
+      showToast(mode === 'eagle' ? '已切换到带鹰' : '已切换到不带鹰');
+    };
+    if (playedCards() > 0 || state.playerHistory.length > 0) {
+      confirmDialog('切换模式', '切换模式会清空本局所有记录，确定吗？', apply);
+    } else { apply(); }
+  }
+
+  function reset() {
+    if (playedCards() === 0 && state.playerHistory.length === 0) { showToast('还没有记录'); return; }
+    confirmDialog('重置本局', '会清空所有记牌和玩家手牌，确定吗？', function () {
+      state.remaining = baseRemaining(state.mode);
+      state.history = [];
+      initPlayers();
+      save();
+      updateAll();
+      updateAllPlayers();
+      showToast('已重置');
+    });
+  }
+
+  /* ===== 批量出牌对话框 ===== */
+  var batchSelected = 1;
+
+  function openBatchDialog() {
+    var sel = el.batchPlayer;
+    sel.innerHTML = '';
+    for (var i = 0; i < NUM_PLAYERS; i += 1) {
+      var opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = PLAYER_NAMES[i] + ' (剩余 ' + formatPlayerCount(state.players[i]) + ')';
+      sel.appendChild(opt);
+    }
+    sel.value = batchSelected;
+
+    var quick = el.batchQuick;
+    quick.innerHTML = '';
+    var amounts = [1, 2, 3, 4, 5, 6, 7, 8];
+    for (var j = 0; j < amounts.length; j += 1) {
+      var btn = document.createElement('button');
+      btn.className = 'quick-btn';
+      btn.type = 'button';
+      btn.textContent = amounts[j];
+      btn.dataset.amount = amounts[j];
+      btn.addEventListener('click', function () {
+        el.batchAmount.value = this.dataset.amount;
+        var all = quick.querySelectorAll('.quick-btn');
+        for (var k = 0; k < all.length; k += 1) all[k].classList.remove('sel');
+        this.classList.add('sel');
+      });
+      quick.appendChild(btn);
+    }
+
+    el.batchAmount.value = '1';
+    el.batchModal.hidden = false;
+    setTimeout(function () { sel.focus(); }, 30);
+  }
+
+  function closeBatchDialog(ok) {
+    el.batchModal.hidden = true;
+    if (!ok) return;
+    var pid = parseInt(el.batchPlayer.value, 10);
+    var n = parseInt(el.batchAmount.value, 10);
+    if (isNaN(pid) || pid < 0 || pid >= NUM_PLAYERS) return;
+    if (isNaN(n) || n < 1) return;
+    var p = state.players[pid];
+    if (n > p.max) {
+      showToast(PLAYER_NAMES[pid] + ' 最多只剩 ' + p.max + ' 张');
+      return;
+    }
+    playerPlay(pid, n);
+    batchSelected = pid;
+    save();
+    updateAllPlayers();
+    animatePlayer(pid, '-' + n, false);
+    showToast(PLAYER_NAMES[pid] + ' 出 ' + n + ' 张, 剩 ' + formatPlayerCount(state.players[pid]));
+  }
+
+  function formatPlayerCount(p) {
+    if (isPlayerDone(p)) return '0';
+    if (isPlayerRange(p)) return p.min + '~' + p.max;
+    return String(p.min);
+  }
+
+  /* ===== 事件绑定 & 初始化 ===== */
+  function bindEvents() {
+    el.modeEagle.addEventListener('click', function () { setMode('eagle'); });
+    el.modePlain.addEventListener('click', function () { setMode('plain'); });
+    el.undoBtn.addEventListener('click', undo);
+    el.resetBtn.addEventListener('click', reset);
+    el.dlgOk.addEventListener('click', function () { closeDialog(true); });
+    el.dlgCancel.addEventListener('click', function () { closeDialog(false); });
+    el.modal.addEventListener('click', function (e) { if (e.target === el.modal) closeDialog(false); });
+    el.batchBtn.addEventListener('click', openBatchDialog);
+    el.batchOk.addEventListener('click', function () { closeBatchDialog(true); });
+    el.batchCancel.addEventListener('click', function () { closeBatchDialog(false); });
+    el.batchModal.addEventListener('click', function (e) { if (e.target === el.batchModal) closeBatchDialog(false); });
+    el.undoPlayerBtn.addEventListener('click', function () {
+      playerUndo();
+      save();
+      updateAllPlayers();
+      showToast('已撤销玩家操作');
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!el.modal.hidden) closeDialog(false);
+        if (!el.batchModal.hidden) closeBatchDialog(false);
+      }
+    });
+  }
+
+  function cacheElements() {
+    el.bigGrid = document.getElementById('bigGrid');
+    el.grid = document.getElementById('grid');
+    el.playerGrid = document.getElementById('playerGrid');
+    el.statRemain = document.getElementById('statRemain');
+    el.statPlayed = document.getElementById('statPlayed');
+    el.statAvg = document.getElementById('statAvg');
+    el.undoBtn = document.getElementById('undoBtn');
+    el.resetBtn = document.getElementById('resetBtn');
+    el.modeEagle = document.getElementById('modeEagle');
+    el.modePlain = document.getElementById('modePlain');
+    el.eagleTotal = document.getElementById('eagleTotal');
+    el.plainTotal = document.getElementById('plainTotal');
+    el.toast = document.getElementById('toast');
+    el.modal = document.getElementById('modal');
+    el.dlgTitle = document.getElementById('dlgTitle');
+    el.dlgText = document.getElementById('dlgText');
+    el.dlgOk = document.getElementById('dlgOk');
+    el.dlgCancel = document.getElementById('dlgCancel');
+    el.batchBtn = document.getElementById('batchBtn');
+    el.batchModal = document.getElementById('batchModal');
+    el.batchPlayer = document.getElementById('batchPlayer');
+    el.batchQuick = document.getElementById('batchQuick');
+    el.batchAmount = document.getElementById('batchAmount');
+    el.batchOk = document.getElementById('batchOk');
+    el.batchCancel = document.getElementById('batchCancel');
+    el.undoPlayerBtn = document.getElementById('undoPlayerBtn');
+  }
+
+  cacheElements();
+  bindEvents();
+  load();
+  buildBoard();
+  buildPlayers();
+  syncMode();
+  updateAll();
+  updateAllPlayers();
+
+  if (playedCards() > 0 || state.playerHistory.length > 0) {
+    setTimeout(function () { showToast('已恢复上次记录'); }, 350);
+  }
+})();
+</script>
+</body>
+</html>
